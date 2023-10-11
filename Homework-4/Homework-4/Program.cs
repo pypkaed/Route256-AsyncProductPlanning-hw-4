@@ -1,114 +1,125 @@
-using System.Globalization;
-using System.Threading.Channels;
-using CsvHelper;
-using CsvHelper.Configuration;
-using Homework_4.Csv;
-using Homework_4.Models;
+using System.Text.Json;
+using Homework_4.Config;
 
 namespace Homework_4;
 
 public class Program
 {
+    private static string _configFilePath;
+    
     public static async Task Main(string[] args)
     {
+        _configFilePath = "/home/pypka/RiderProjects/homework-4/Homework-4/Homework-4/Config/config.json";
+        
         // TODO: add exception handling and wrong file input
         // TODO: add parser
-        if (args.Length < 1)
-        {
-            Console.WriteLine("Give me the file path moron...");
-            return;
-        }
+        // TODO: change it using json
+        var parallelOptions = InitializeParallelOptions();
         
-        // TODO: add output file option
-        // TODO: make into a continuous console
-        var filePath = args[0];
-        var fileOutputPath = "output.csv";
-
-        var readLinesCount = 0;
-        var calculatedProductDemandsCount = 0;
-        var wroteEntriesCount = 0;
-
-        // TODO: ???
-        using var reader = new StreamReader(filePath);
-        await using var writer = new StreamWriter(fileOutputPath);
-        using var csvReader = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture));
-        await using var csvWriter = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
-        
-        // read from csv yielding to prevent storing everything in memory
-        IAsyncEnumerable<ProductStatsCsv> productStats = csvReader.GetRecordsAsync<ProductStatsCsv>();
-        
-        csvWriter.WriteHeader<ProductDemandCsv>();
-        await csvWriter.NextRecordAsync();
-
-        var parallelOptions = new ParallelOptions()
+        var quit = false;
+        while (!quit)
         {
-            MaxDegreeOfParallelism = Config.ConfigMaxDegreeOfParallelism
-        };
-        var channel = Channel.CreateUnbounded<ProductDemandCsv>();
+            Console.WriteLine("1. Process file | 2. Change level of parallelism | 3. Quit");
+            Int32.TryParse(Console.ReadLine(), out var command);
 
-        // run background tasks
-        // TODO: turn into long-running tasks?
-        _ = Task.Run(() => UserInputListener(parallelOptions));
-        _ = Task.Run(() => ConfigChangeListener(parallelOptions));
-
-        var consumeTask = Task.Run(async () =>
-        {
-            await foreach (var productDemandCsv in channel.Reader.ReadAllAsync())
+            try
             {
-                if (csvWriter is null) { continue; }
-                csvWriter.WriteRecord(productDemandCsv);
-                await csvWriter.NextRecordAsync();
+                switch (command)
+                {
+                    case 1:
+                        await ProcessFile(parallelOptions);
+                        break;
+                    case 2:
+                        ChangeMaxDegreeOfParallelism(parallelOptions);
+                        break;
+                    case 3:
+                        quit = ExitApp();
+                        break;
+                    default:
+                        Console.WriteLine("Wrong input");
+                        break;
+                }
             }
-        });
-        
-        await Parallel.ForEachAsync(
-            productStats,
-            parallelOptions,
-            async (productStat, cancellationToken) =>
+            catch (Exception e)
             {
-                // TODO: channels for logging output
-                // Console.WriteLine($"Read {Interlocked.Increment(ref readLinesCount)} lines.");
-
-                var demand = new Demand(productStat.Prediction - productStat.Stock);
-                var productCsv = new ProductDemandCsv(productStat.Id, demand);
-                
-                // Console.WriteLine($"Calculated {Interlocked.Increment(ref calculatedProductDemandsCount)} product demands.");
-                
-                await channel.Writer.WriteAsync(productCsv);
-                // Console.WriteLine($"Wrote {Interlocked.Increment(ref wroteEntriesCount)} entries.");
-            });
-        
-        channel.Writer.Complete();
-    }
-
-    // TODO: json file with config
-    private static void ConfigChangeListener(ParallelOptions parallelOptions)
-    {
-        
+                Console.WriteLine(e.Message);
+            }
+        }
     }
     
-    private static void UserInputListener(ParallelOptions parallelOptions)
+    private static bool ExitApp()
     {
-        while (true)
+        Console.WriteLine("Exiting app.");
+        return true;
+    }
+
+    private static string ReadFilePath()
+    {
+        var filePath = Console.ReadLine();
+        if (filePath is null or "")
         {
-            Console.WriteLine("Enter a new value for MaxDegreeOfParallelism or 'quit' to exit:");
-            string userInput = Console.ReadLine();
-
-            if (userInput == "quit")
-            {
-                break;
-            }
-
-            if (int.TryParse(userInput, out int newMaxDegree))
-            {
-                parallelOptions.MaxDegreeOfParallelism = newMaxDegree;
-                Config.ConfigMaxDegreeOfParallelism = newMaxDegree;
-                Console.WriteLine($"MaxDegreeOfParallelism changed to {newMaxDegree}");
-            }
-            else
-            {
-                Console.WriteLine("MaxDegreeOfParallelism should be an integer. 'quit' to exit.");
-            }
+            throw new Exception("File path is invalid.");
         }
+
+        return filePath;
+    }
+
+    private static ParallelOptions InitializeParallelOptions()
+    {
+        var jsonString = File.ReadAllText(_configFilePath);
+        var config = JsonSerializer.Deserialize<FileProcessorConfig>(jsonString);
+        
+        var parallelOptions = new ParallelOptions()
+        {
+            MaxDegreeOfParallelism = config.MaxDegreeOfParallelism
+        };
+
+        Console.WriteLine($"Parallel options on initialize: {parallelOptions}");
+        return parallelOptions;
+    }
+
+    private static void ChangeMaxDegreeOfParallelism(ParallelOptions parallelOptions)
+    {
+        Console.WriteLine("Enter a new value for MaxDegreeOfParallelism: ");
+        if (!Int32.TryParse(Console.ReadLine(), out int newMaxDegree))
+        {
+            Console.WriteLine("MaxDegreeOfParallelism should be an integer.");
+            return;
+        }
+
+        if (newMaxDegree <= 0)
+        {
+            Console.WriteLine("MaxDegreeOfParallelism should be positive.");
+            return;
+        }
+
+        parallelOptions.MaxDegreeOfParallelism = newMaxDegree;
+
+        ChangeFileProcessorConfigMaxParallelism(newMaxDegree);
+        
+        Console.WriteLine($"MaxDegreeOfParallelism changed to {newMaxDegree}");
+    }
+
+    private static void ChangeFileProcessorConfigMaxParallelism(int newMaxDegree)
+    {
+        var config = new FileProcessorConfig()
+        {
+            MaxDegreeOfParallelism = newMaxDegree
+        };
+
+        string jsonString = JsonSerializer.Serialize<FileProcessorConfig>(config);
+        
+        File.WriteAllText(_configFilePath, jsonString);
+    }
+
+    private static async Task ProcessFile(ParallelOptions parallelOptions)
+    {
+        Console.WriteLine("Input file path: ");
+        var inputFilePath = ReadFilePath();
+        Console.WriteLine("Output file path: ");
+        var outputFilePath = ReadFilePath();
+
+        var processor = new FileProcessor(_configFilePath);
+        await processor.RunProcessing(inputFilePath, outputFilePath, parallelOptions);
     }
 }
