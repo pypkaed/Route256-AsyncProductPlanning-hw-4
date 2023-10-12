@@ -1,6 +1,3 @@
-using System.Text.Json;
-using Homework_4.Config;
-
 namespace Homework_4;
 
 public class Program
@@ -12,9 +9,9 @@ public class Program
         _configFilePath = "/home/pypka/RiderProjects/homework-4/Homework-4/Homework-4/Config/config.json";
         
         // TODO: add exception handling and wrong file input
-        // TODO: add parser
-        // TODO: change it using json
-        var parallelOptions = InitializeParallelOptions();
+        var configManager = new FileProcessorConfigManager(_configFilePath);
+        var parallelOptions = configManager.InitializeParallelOptions();
+        var processor = new FileProcessor(_configFilePath);
         
         var quit = false;
         while (!quit)
@@ -27,10 +24,10 @@ public class Program
                 switch (command)
                 {
                     case 1:
-                        await ProcessFile(parallelOptions);
+                        await ProcessFile(parallelOptions, processor);
                         break;
                     case 2:
-                        ChangeMaxDegreeOfParallelism(parallelOptions);
+                        ChangeMaxDegreeOfParallelism(parallelOptions, configManager);
                         break;
                     case 3:
                         quit = ExitApp();
@@ -64,21 +61,7 @@ public class Program
         return filePath;
     }
 
-    private static ParallelOptions InitializeParallelOptions()
-    {
-        var jsonString = File.ReadAllText(_configFilePath);
-        var config = JsonSerializer.Deserialize<FileProcessorConfig>(jsonString);
-        
-        var parallelOptions = new ParallelOptions()
-        {
-            MaxDegreeOfParallelism = config.MaxDegreeOfParallelism
-        };
-
-        Console.WriteLine($"Parallel options on initialize: {parallelOptions}");
-        return parallelOptions;
-    }
-
-    private static void ChangeMaxDegreeOfParallelism(ParallelOptions parallelOptions)
+    private static void ChangeMaxDegreeOfParallelism(ParallelOptions parallelOptions, FileProcessorConfigManager configManager)
     {
         Console.WriteLine("Enter a new value for MaxDegreeOfParallelism: ");
         if (!Int32.TryParse(Console.ReadLine(), out int newMaxDegree))
@@ -95,31 +78,18 @@ public class Program
 
         parallelOptions.MaxDegreeOfParallelism = newMaxDegree;
 
-        ChangeFileProcessorConfigMaxParallelism(newMaxDegree);
+        configManager.ChangeFileProcessorConfigMaxParallelism(newMaxDegree);
         
         Console.WriteLine($"MaxDegreeOfParallelism changed to {newMaxDegree}");
     }
 
-    private static void ChangeFileProcessorConfigMaxParallelism(int newMaxDegree)
-    {
-        var config = new FileProcessorConfig()
-        {
-            MaxDegreeOfParallelism = newMaxDegree
-        };
-
-        string jsonString = JsonSerializer.Serialize<FileProcessorConfig>(config);
-        
-        File.WriteAllText(_configFilePath, jsonString);
-    }
-
-    private static async Task ProcessFile(ParallelOptions parallelOptions)
+    private static async Task ProcessFile(ParallelOptions parallelOptions, FileProcessor processor)
     {
         Console.WriteLine("Input file path: ");
         var inputFilePath = ReadFilePath();
         Console.WriteLine("Output file path: ");
         var outputFilePath = ReadFilePath();
 
-        var processor = new FileProcessor(_configFilePath);
         await processor.RunProcessing(inputFilePath, outputFilePath, parallelOptions);
     }
 }

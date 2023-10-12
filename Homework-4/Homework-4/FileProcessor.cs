@@ -13,8 +13,8 @@ namespace Homework_4;
 public class FileProcessor
 {
     private readonly ILogger<FileProcessor> _logger;
-    private static string _configFilePath;
-    private static DateTime _lastModifiedConfigFile;
+    private readonly string _configFilePath;
+    private DateTime _lastModifiedConfigFile;
 
     public FileProcessor(string configFilePath)
     {
@@ -58,9 +58,7 @@ public class FileProcessor
         ParallelOptions parallelOptions,
         Channel<ProductDemandCsv> channel)
     {
-        var readLinesCount = 0;
-        var calculatedProductDemandsCount = 0;
-        var wroteEntriesCount = 0;
+        Counters counters = new Counters();
 
         var tasks = new List<Task>();
         
@@ -71,24 +69,26 @@ public class FileProcessor
                 await Task.WhenAll(tasks);
                 tasks.Clear();
             }
-            
-            tasks.Add(Task.Run(async () =>
-            {
-                // TODO: channels for logging output?
-                _logger
-                    .LogInformation($"Read {Interlocked.Increment(ref readLinesCount)} lines.");
-                
-                var demand = new Demand(productStat.Prediction - productStat.Stock);
-                var productCsv = new ProductDemandCsv(productStat.Id, demand);
 
-                _logger
-                    .LogInformation($"Calculated {Interlocked.Increment(ref calculatedProductDemandsCount)} product demands.");
-                
-                await channel.Writer.WriteAsync(productCsv);
-                _logger
-                    .LogInformation($"Wrote {Interlocked.Increment(ref wroteEntriesCount)} entries.");
-            }));
+            tasks.Add(Task.Run(async () => await ProcessProductStat(productStat, channel, counters)));
         }
+    }
+
+    private async Task ProcessProductStat(ProductStatsCsv productStat, Channel<ProductDemandCsv> channel, Counters counters)
+    {
+        // TODO: channels for logging output?
+        _logger
+            .LogInformation($"Read {Interlocked.Increment(ref counters.ReadLinesCount)} lines.");
+                
+        var demand = new Demand(productStat.Prediction - productStat.Stock);
+        var productCsv = new ProductDemandCsv(productStat.Id, demand);
+        
+        _logger
+            .LogInformation($"Calculated {Interlocked.Increment(ref counters.CalculatedProductDemandsCount)} product demands.");
+                
+        await channel.Writer.WriteAsync(productCsv);
+        _logger
+            .LogInformation($"Wrote {Interlocked.Increment(ref counters.WroteEntriesCount)} entries.");
     }
 
     private static void RunConsumeTask(Channel<ProductDemandCsv> channel, CsvWriter csvWriter)
@@ -103,18 +103,16 @@ public class FileProcessor
         });
     }
 
-    private static void RunConfigChangeListenerTask(ParallelOptions parallelOptions, CancellationToken cancellationToken)
+    private void RunConfigChangeListenerTask(ParallelOptions parallelOptions, CancellationToken cancellationToken)
     {
         // NOTE: a long-running background task to listen to config file changes
-        // var factory = new TaskFactory();
-        // var configChangeListenerTask = factory.StartNew(
-        //         () => ConfigChangeListener(parallelOptions),
-        //         TaskCreationOptions.LongRunning);
-        var configChangeListenerTask = Task.Run(() => ConfigChangeListener(parallelOptions));
+        var factory = new TaskFactory();
+        var configChangeListenerTask = factory.StartNew(
+                () => ConfigChangeListener(parallelOptions),
+                TaskCreationOptions.LongRunning);
     }
     
-     // TODO: json file with config
-    private static async Task ConfigChangeListener(ParallelOptions parallelOptions)
+    private async Task ConfigChangeListener(ParallelOptions parallelOptions)
     {
         while (true)
         {
@@ -123,17 +121,23 @@ public class FileProcessor
             
             _lastModifiedConfigFile = modifiedTime;
 
-            string jsonString;
-            using (var streamReader = new StreamReader(_configFilePath))
-            {
-                jsonString = streamReader.ReadToEnd();
-            }
-
-            var config = JsonSerializer.Deserialize<FileProcessorConfig>(jsonString);
+            var config = DeserealizeConfig();
 
             parallelOptions.MaxDegreeOfParallelism = config.MaxDegreeOfParallelism;
 
             Console.WriteLine($"MaxDegreeOfParallelism changed to {config.MaxDegreeOfParallelism}");
         }
+    }
+
+    private FileProcessorConfig DeserealizeConfig()
+    {
+        string jsonString;
+        using (var streamReader = new StreamReader(_configFilePath))
+        {
+            jsonString = streamReader.ReadToEnd();
+        }
+
+        var config = JsonSerializer.Deserialize<FileProcessorConfig>(jsonString);
+        return config;
     }
 }
