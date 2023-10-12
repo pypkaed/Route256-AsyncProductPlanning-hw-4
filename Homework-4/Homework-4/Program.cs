@@ -11,7 +11,9 @@ public class Program
         // TODO: add exception handling and wrong file input
         var configManager = new FileProcessorConfigManager(_configFilePath);
         var parallelOptions = configManager.InitializeParallelOptions();
-        var processor = new FileProcessor(_configFilePath);
+        var processor = new FileProcessor();
+        
+        configManager.RunConfigChangeListenerTask(parallelOptions, new CancellationToken());
         
         var quit = false;
         while (!quit)
