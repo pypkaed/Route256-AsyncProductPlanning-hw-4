@@ -72,7 +72,7 @@ public class FileProcessor
         _logger
             .LogInformation($"Read {Interlocked.Increment(ref counters.ReadLinesCount)} lines.");
                 
-        var demand = new Demand(productStat.Prediction - productStat.Stock);
+        var demand = new ProductDemand(productStat.Prediction.Value - productStat.Stock.Value);
         var productCsv = new ProductDemandCsv(productStat.Id, demand);
         
         _logger

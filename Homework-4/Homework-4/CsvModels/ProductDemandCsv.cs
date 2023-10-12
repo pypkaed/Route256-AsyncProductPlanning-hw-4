@@ -5,16 +5,16 @@ namespace Homework_4.CsvModels;
 
 public class ProductDemandCsv
 {
-    public ProductDemandCsv(long id, Demand demand)
+    public ProductDemandCsv(ProductId id, ProductDemand productDemand)
     {
         Id = id;
-        Demand = demand;
+        ProductDemand = productDemand;
     }
 
     protected ProductDemandCsv() { }
 
     [Name("id")]
-    public long Id { get; set; }
+    public ProductId Id { get; set; }
     [Name("demand")]
-    public Demand Demand { get; set; }
+    public ProductDemand ProductDemand { get; set; }
 }

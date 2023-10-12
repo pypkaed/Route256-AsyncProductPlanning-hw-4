@@ -1,10 +1,11 @@
 using CsvHelper.Configuration.Attributes;
+using Homework_4.Models;
 
 namespace Homework_4.CsvModels;
 
 public class ProductStatsCsv
 {
-    public ProductStatsCsv(long id, long prediction, long stock)
+    public ProductStatsCsv(ProductId id, ProductPrediction prediction, ProductStock stock)
     {
         Id = id;
         Prediction = prediction;
@@ -12,11 +13,10 @@ public class ProductStatsCsv
     }
     protected ProductStatsCsv() { }
     
-    // TODO: VO
     [Name("id")]
-    public long Id { get; set; }
+    public ProductId Id { get; set; }
     [Name("prediction")]
-    public long Prediction { get; set; }
+    public ProductPrediction Prediction { get; set; }
     [Name("stock")]
-    public long Stock { get; set; }
+    public ProductStock Stock { get; set; }
 }
