@@ -1,7 +1,7 @@
 using CsvHelper.Configuration.Attributes;
 using Homework_4.Models;
 
-namespace Homework_4.Csv;
+namespace Homework_4.CsvModels;
 
 public class ProductDemandCsv
 {

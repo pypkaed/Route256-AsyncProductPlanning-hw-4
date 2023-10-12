@@ -1,6 +1,6 @@
 using CsvHelper.Configuration.Attributes;
 
-namespace Homework_4.Csv;
+namespace Homework_4.CsvModels;
 
 public class ProductStatsCsv
 {
