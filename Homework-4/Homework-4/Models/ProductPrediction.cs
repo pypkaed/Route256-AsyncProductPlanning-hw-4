@@ -1,19 +1,20 @@
 using CsvHelper.Configuration.Attributes;
+using Homework_4.Exceptions;
 
 namespace Homework_4.Models;
 
 public record ProductPrediction
 {
-    public ProductPrediction(long value)
+    public ProductPrediction(long prediction)
     {
-        if (value < 0)
+        if (prediction < 0)
         {
-            throw new Exception($"Ivalid product prediction {value}");
+            throw ModelException.InvalidModelInput(nameof(ProductPrediction), prediction);
         }
 
-        Value = value;
+        Prediction = prediction;
     }
     
     [Name("prediction")]
-    public long Value { get; private set; }
+    public long Prediction { get; private set; }
 }

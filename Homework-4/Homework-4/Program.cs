@@ -1,3 +1,5 @@
+using Homework_4.Exceptions;
+
 namespace Homework_4;
 
 public class Program

@@ -4,16 +4,16 @@ namespace Homework_4.Models;
 
 public record ProductDemand
 {
-    public ProductDemand(long value)
+    public ProductDemand(long demand)
     {
-        if (value < 0)
+        if (demand < 0)
         {
-            value = 0;
+            demand = 0;
         }
 
-        Value = value;
+        Demand = demand;
     }
     
     [Name("demand")]
-    public long Value { get; private set; }
+    public long Demand { get; private set; }
 }

@@ -1,4 +1,5 @@
 using CsvHelper.Configuration.Attributes;
+using Homework_4.Exceptions;
 
 namespace Homework_4.Models;
 
@@ -8,7 +9,7 @@ public record ProductId
     {
         if (id < 0)
         {
-            throw new Exception($"Invalid product id: {id}");
+            throw ModelException.InvalidModelInput(nameof(ProductId), id);
         }
         
         Id = id;

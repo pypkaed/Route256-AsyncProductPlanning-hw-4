@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Homework_4.CsvModels;
+using Homework_4.Exceptions;
 using Homework_4.Models;
 using Microsoft.Extensions.Logging;
 
@@ -61,7 +62,7 @@ public class FileProcessor
                 await Task.WhenAll(tasks);
                 tasks.Clear();
             }
-
+            
             tasks.Add(Task.Run(async () => await ProcessProductStat(productStat, channel, counters)));
         }
     }
@@ -72,9 +73,9 @@ public class FileProcessor
         _logger
             .LogInformation($"Read {Interlocked.Increment(ref counters.ReadLinesCount)} lines.");
                 
-        var demand = new ProductDemand(productStat.Prediction.Value - productStat.Stock.Value);
+        var demand = new ProductDemand(productStat.Prediction.Prediction - productStat.Stock.Stock);
         var productCsv = new ProductDemandCsv(productStat.Id, demand);
-        
+
         _logger
             .LogInformation($"Calculated {Interlocked.Increment(ref counters.CalculatedProductDemandsCount)} product demands.");
                 
