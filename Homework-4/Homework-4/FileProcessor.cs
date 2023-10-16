@@ -42,9 +42,9 @@ public class FileProcessor
         
         var channel = Channel.CreateUnbounded<ProductDemandCsv>();
 
-        await RunConsumeTask(channel, csvWriter);
+        await RunConsumeTask(channel.Reader, csvWriter);
         
-        await ProcessProductStats(productStats, parallelOptions, channel, cancellationToken);
+        await ProcessProductStats(productStats, parallelOptions, channel.Writer, cancellationToken);
         
         channel.Writer.Complete();
     }
@@ -52,7 +52,7 @@ public class FileProcessor
     private async Task ProcessProductStats(
         IAsyncEnumerable<ProductStatsCsv> productStats,
         ParallelOptions parallelOptions,
-        Channel<ProductDemandCsv> channel,
+        ChannelWriter<ProductDemandCsv> channelWriter,
         CancellationToken cancellationToken)
     {
         Counters counters = new Counters();
@@ -72,11 +72,11 @@ public class FileProcessor
                 tasks.Clear();
             }
             
-            tasks.Add(Task.Run(() => ProcessProductStat(productStat, channel, counters)));
+            tasks.Add(Task.Run(() => ProcessProductStat(productStat, channelWriter, counters)));
         }
     }
 
-    private async Task ProcessProductStat(ProductStatsCsv productStat, Channel<ProductDemandCsv> channel, Counters counters)
+    private async Task ProcessProductStat(ProductStatsCsv productStat, ChannelWriter<ProductDemandCsv> channelWriter, Counters counters)
     {
         // TODO: channels for logging output?
         _logger
@@ -88,16 +88,16 @@ public class FileProcessor
         _logger
             .LogInformation($"Calculated {Interlocked.Increment(ref counters.CalculatedProductDemandsCount)} product demands.");
                 
-        await channel.Writer.WriteAsync(productCsv);
+        await channelWriter.WriteAsync(productCsv);
         _logger
             .LogInformation($"Wrote {Interlocked.Increment(ref counters.WroteEntriesCount)} entries.");
     }
 
-    private static Task RunConsumeTask(Channel<ProductDemandCsv> channel, CsvWriter csvWriter)
+    private static Task RunConsumeTask(ChannelReader<ProductDemandCsv> channelReader, CsvWriter csvWriter)
     {
         var consumeTask = Task.Run(async () =>
         {
-            await foreach (var productDemandCsv in channel.Reader.ReadAllAsync())
+            await foreach (var productDemandCsv in channelReader.ReadAllAsync())
             {
                 csvWriter.WriteRecord(productDemandCsv);
                 await csvWriter.NextRecordAsync();
