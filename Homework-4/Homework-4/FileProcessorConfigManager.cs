@@ -12,9 +12,12 @@ public class FileProcessorConfigManager
     {
         _configFilePath = configFilePath;
         _lastModifiedConfigFile = File.GetLastWriteTime(_configFilePath);
+        ParallelOptions = InitializeParallelOptions();
     }
     
-    public ParallelOptions InitializeParallelOptions()
+    public ParallelOptions ParallelOptions { get; init; }
+    
+    private ParallelOptions InitializeParallelOptions()
     {
         var jsonString = File.ReadAllText(_configFilePath);
         var config = JsonSerializer.Deserialize<FileProcessorConfig>(jsonString);
@@ -44,16 +47,16 @@ public class FileProcessorConfigManager
         File.WriteAllText(_configFilePath, jsonString);
     }
     
-    public void RunConfigChangeListenerTask(ParallelOptions parallelOptions, CancellationToken cancellationToken)
+    public void RunConfigChangeListenerTask()
     {
         // NOTE: a long-running background task to listen to config file changes
         var factory = new TaskFactory();
         var configChangeListenerTask = factory.StartNew(
-            () => ConfigChangeListener(parallelOptions),
+            ConfigChangeListener,
             TaskCreationOptions.LongRunning);
     }
     
-    private async Task ConfigChangeListener(ParallelOptions parallelOptions)
+    private async Task ConfigChangeListener()
     {
         while (true)
         {
@@ -64,7 +67,7 @@ public class FileProcessorConfigManager
 
             var config = DeserealizeConfig();
 
-            parallelOptions.MaxDegreeOfParallelism = config.MaxDegreeOfParallelism;
+            ParallelOptions.MaxDegreeOfParallelism = config.MaxDegreeOfParallelism;
 
             Console.WriteLine($"MaxDegreeOfParallelism changed to {config.MaxDegreeOfParallelism}");
         }

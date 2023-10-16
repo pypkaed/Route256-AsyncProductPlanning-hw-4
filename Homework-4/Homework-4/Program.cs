@@ -1,5 +1,3 @@
-using Homework_4.Exceptions;
-
 namespace Homework_4;
 
 public class Program
@@ -12,10 +10,9 @@ public class Program
         
         // TODO: add exception handling and wrong file input
         var configManager = new FileProcessorConfigManager(_configFilePath);
-        var parallelOptions = configManager.InitializeParallelOptions();
         var processor = new FileProcessor();
         
-        configManager.RunConfigChangeListenerTask(parallelOptions, new CancellationToken());
+        configManager.RunConfigChangeListenerTask();
         
         var quit = false;
         while (!quit)
@@ -28,10 +25,10 @@ public class Program
                 switch (command)
                 {
                     case 1:
-                        await ProcessFile(parallelOptions, processor);
+                        await ProcessFile(configManager.ParallelOptions, processor);
                         break;
                     case 2:
-                        ChangeMaxDegreeOfParallelism(parallelOptions, configManager);
+                        ChangeMaxDegreeOfParallelism(configManager.ParallelOptions, configManager);
                         break;
                     case 3:
                         quit = ExitApp();
