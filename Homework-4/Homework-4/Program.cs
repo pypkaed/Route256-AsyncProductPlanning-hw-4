@@ -6,6 +6,14 @@ public class Program
     
     public static async Task Main(string[] args)
     {
+        var cancellationTokenSource = new CancellationTokenSource();
+        Console.CancelKeyPress += async (s, eventArgs) =>
+        {
+            Console.WriteLine("Cancelled.");
+            cancellationTokenSource.Cancel();
+            eventArgs.Cancel = true;
+        };
+        
         _configFilePath = "/home/pypka/RiderProjects/homework-4/Homework-4/Homework-4/Config/config.json";
         
         // TODO: add exception handling and wrong file input
@@ -14,6 +22,14 @@ public class Program
         
         configManager.RunConfigChangeListenerTask();
         
+        await Run(configManager, processor, cancellationTokenSource);
+    }
+
+    private static async Task Run(
+        FileProcessorConfigManager configManager, 
+        FileProcessor processor,
+        CancellationTokenSource cancellationTokenSource)
+    {
         var quit = false;
         while (!quit)
         {
@@ -25,7 +41,7 @@ public class Program
                 switch (command)
                 {
                     case 1:
-                        await ProcessFile(configManager.ParallelOptions, processor);
+                        await ProcessFile(configManager.ParallelOptions, processor, cancellationTokenSource.Token);
                         break;
                     case 2:
                         ChangeMaxDegreeOfParallelism(configManager.ParallelOptions, configManager);
@@ -84,13 +100,16 @@ public class Program
         Console.WriteLine($"MaxDegreeOfParallelism changed to {newMaxDegree}");
     }
 
-    private static async Task ProcessFile(ParallelOptions parallelOptions, FileProcessor processor)
+    private static async Task ProcessFile(
+        ParallelOptions parallelOptions, 
+        FileProcessor processor, 
+        CancellationToken cancellationToken)
     {
         Console.WriteLine("Input file path: ");
         var inputFilePath = ReadFilePath();
         Console.WriteLine("Output file path: ");
         var outputFilePath = ReadFilePath();
 
-        await processor.RunProcessing(inputFilePath, outputFilePath, parallelOptions);
+        await processor.RunProcessing(inputFilePath, outputFilePath, parallelOptions, cancellationToken);
     }
 }

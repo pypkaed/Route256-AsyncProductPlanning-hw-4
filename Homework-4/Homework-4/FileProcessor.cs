@@ -3,7 +3,6 @@ using System.Threading.Channels;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Homework_4.CsvModels;
-using Homework_4.Exceptions;
 using Homework_4.Models;
 using Microsoft.Extensions.Logging;
 
@@ -24,7 +23,11 @@ public class FileProcessor
         _logger = loggerFactory.CreateLogger<FileProcessor>();
     }
 
-    public async Task RunProcessing(string inputFilePath, string outputFilePath, ParallelOptions parallelOptions)
+    public async Task RunProcessing(
+        string inputFilePath,
+        string outputFilePath,
+        ParallelOptions parallelOptions,
+        CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(inputFilePath);
         await using var writer = new StreamWriter(outputFilePath);
@@ -39,9 +42,9 @@ public class FileProcessor
         
         var channel = Channel.CreateUnbounded<ProductDemandCsv>();
 
-        RunConsumeTask(channel, csvWriter);
+        await RunConsumeTask(channel, csvWriter);
         
-        await ProcessProductStats(productStats, parallelOptions, channel);
+        await ProcessProductStats(productStats, parallelOptions, channel, cancellationToken);
         
         channel.Writer.Complete();
     }
@@ -49,7 +52,8 @@ public class FileProcessor
     private async Task ProcessProductStats(
         IAsyncEnumerable<ProductStatsCsv> productStats,
         ParallelOptions parallelOptions,
-        Channel<ProductDemandCsv> channel)
+        Channel<ProductDemandCsv> channel,
+        CancellationToken cancellationToken)
     {
         Counters counters = new Counters();
 
@@ -57,6 +61,11 @@ public class FileProcessor
         
         await foreach (var productStat in productStats)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            
             if (tasks.Count >= parallelOptions.MaxDegreeOfParallelism)
             {
                 await Task.WhenAll(tasks);
@@ -84,7 +93,7 @@ public class FileProcessor
             .LogInformation($"Wrote {Interlocked.Increment(ref counters.WroteEntriesCount)} entries.");
     }
 
-    private static void RunConsumeTask(Channel<ProductDemandCsv> channel, CsvWriter csvWriter)
+    private static Task RunConsumeTask(Channel<ProductDemandCsv> channel, CsvWriter csvWriter)
     {
         var consumeTask = Task.Run(async () =>
         {
@@ -94,5 +103,7 @@ public class FileProcessor
                 await csvWriter.NextRecordAsync();
             }
         });
+
+        return consumeTask;
     }
 }
