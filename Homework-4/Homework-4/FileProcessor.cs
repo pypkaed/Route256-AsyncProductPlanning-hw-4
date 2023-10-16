@@ -63,7 +63,7 @@ public class FileProcessor
                 tasks.Clear();
             }
             
-            tasks.Add(Task.Run(async () => await ProcessProductStat(productStat, channel, counters)));
+            tasks.Add(Task.Run(() => ProcessProductStat(productStat, channel, counters)));
         }
     }
 
