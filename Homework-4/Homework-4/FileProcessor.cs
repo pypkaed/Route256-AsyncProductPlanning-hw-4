@@ -42,9 +42,10 @@ public class FileProcessor
         
         var channel = Channel.CreateUnbounded<ProductDemandCsv>();
 
-        await RunConsumeTask(channel.Reader, csvWriter);
-        
-        await ProcessProductStats(productStats, parallelOptions, channel.Writer, cancellationToken);
+        var consumeTask = RunConsumeTask(channel.Reader, csvWriter, cancellationToken);
+        var processTask = ProcessProductStats(productStats, parallelOptions, channel.Writer, cancellationToken);
+
+        await Task.WhenAll(consumeTask, processTask);
         
         channel.Writer.Complete();
     }
@@ -61,10 +62,7 @@ public class FileProcessor
         
         await foreach (var productStat in productStats)
         {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                break;
-            }
+            cancellationToken.ThrowIfCancellationRequested();
             
             if (tasks.Count >= parallelOptions.MaxDegreeOfParallelism)
             {
@@ -72,7 +70,7 @@ public class FileProcessor
                 tasks.Clear();
             }
             
-            tasks.Add(Task.Run(() => ProcessProductStat(productStat, channelWriter, counters)));
+            tasks.Add(ProcessProductStat(productStat, channelWriter, counters));
         }
     }
 
@@ -93,12 +91,16 @@ public class FileProcessor
             .LogInformation($"Wrote {Interlocked.Increment(ref counters.WroteEntriesCount)} entries.");
     }
 
-    private static Task RunConsumeTask(ChannelReader<ProductDemandCsv> channelReader, CsvWriter csvWriter)
+    private static Task RunConsumeTask(
+        ChannelReader<ProductDemandCsv> channelReader,
+        CsvWriter csvWriter,
+        CancellationToken cancellationToken)
     {
         var consumeTask = Task.Run(async () =>
         {
             await foreach (var productDemandCsv in channelReader.ReadAllAsync())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 csvWriter.WriteRecord(productDemandCsv);
                 await csvWriter.NextRecordAsync();
             }
